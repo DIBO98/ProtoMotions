@@ -299,7 +299,7 @@ class SimulatorConfig(ConfigBuilder):
     num_envs: int
     sim: SimParams
     experiment_name: str
-    plane: PlaneConfig = PlaneConfig()
+    plane: PlaneConfig = field(default_factory=PlaneConfig)
     camera: Optional[Any] = None
     record_viewer: bool = False
     viewer_record_dir: str = "output/recordings/viewer"
