@@ -102,7 +102,7 @@ class PPO:
         if checkpoint is not None:
             checkpoint = Path(checkpoint).resolve()
             print(f"Loading model from checkpoint: {checkpoint}")
-            state_dict = torch.load(checkpoint, map_location=self.device)
+            state_dict = torch.load(checkpoint, map_location=self.device, weights_only=False)
             self.load_parameters(state_dict)
             
             env_checkpoint = checkpoint.resolve().parent / f"env_{self.fabric.global_rank}.ckpt"
@@ -320,6 +320,7 @@ class PPO:
                     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
                 self.experience_buffer.batch_update_data("advantages", advantages)
 
+            torch.cuda.empty_cache()
             training_log_dict = self.optimize_model()
             training_log_dict["epoch"] = self.current_epoch
             self.current_epoch += 1

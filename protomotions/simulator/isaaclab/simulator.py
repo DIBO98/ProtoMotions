@@ -1,5 +1,13 @@
 import torch
 
+import importlib
+
+# --- GUI 모듈은 선택적으로 로드 (headless에서 없음) ---
+try:
+    appwindow = importlib.import_module("omni.appwindow")
+except Exception:
+    appwindow = None
+
 import isaaclab.sim as sim_utils
 from isaaclab.scene import InteractiveScene
 from isaaclab.sim import SimulationContext, PhysxCfg
@@ -262,16 +270,40 @@ class IsaacLabSimulator(Simulator):
         """
         Set up keyboard callbacks for control using the Se2Keyboard interface.
         """
-        from isaaclab.devices.keyboard.se2_keyboard import Se2Keyboard
+        # 1) import 경로 정리: 먼저 'isaaclab.isaaclab...'를 시도, 안 되면 기존 경로로 fallback
+        try:
+            from isaaclab.isaaclab.devices.keyboard.se2_keyboard import Se2Keyboard, Se2KeyboardCfg
+        except ImportError:
+            # 일부 배포/소스 레이아웃에선 이 경로가 맞을 수 있음
+            from isaaclab.devices.keyboard.se2_keyboard import Se2Keyboard, Se2KeyboardCfg
 
-        self.keyboard_interface = Se2Keyboard()
-        self.keyboard_interface.add_callback("R", self._requested_reset)
-        self.keyboard_interface.add_callback("U", self._update_inference_parameters)
-        self.keyboard_interface.add_callback("L", self._toggle_video_record)
-        self.keyboard_interface.add_callback(";", self._cancel_video_record)
-        self.keyboard_interface.add_callback("Q", self.close)
-        self.keyboard_interface.add_callback("O", self._toggle_camera_target)
-        self.keyboard_interface.add_callback("J", self._push_robot)
+        # 2) 기본값: 키보드 비활성(생성 실패 대비)
+        self.keyboard_interface = None
+
+        try:
+            # 3) cfg를 반드시 넘겨서 생성
+            cfg = Se2KeyboardCfg()
+            self.keyboard_interface = Se2Keyboard(cfg=cfg)
+
+            # 4) 콜백 등록
+            kb = self.keyboard_interface
+            kb.add_callback("R", self._requested_reset)
+            kb.add_callback("U", self._update_inference_parameters)
+            kb.add_callback("L", self._toggle_video_record)
+            kb.add_callback(";", self._cancel_video_record)
+            kb.add_callback("Q", self.close)
+            kb.add_callback("O", self._toggle_camera_target)
+            kb.add_callback("J", self._push_robot)
+
+        except Exception as e:
+            # 생성 실패하면 깔끔히 비활성화하고 로그만 남김
+            # (logger가 없다면 print로 대체)
+            try:
+                self.logger.warning(f"[keyboard] Se2Keyboard disabled: {e}")
+            except Exception:
+                print(f"[keyboard] Se2Keyboard disabled: {e}")
+            self.keyboard_interface = None
+
 
     # =====================================================
     # Group 2: Environment Setup & Configuration
