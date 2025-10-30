@@ -7,6 +7,7 @@ import hydra
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import torch
+from omegaconf import OmegaConf
 
 # wandb는 선택적 사용
 try:
@@ -38,6 +39,14 @@ for arg in sys.argv:
 
 # 로거
 log = logging.getLogger(__name__)
+
+def _safe_register_resolvers():
+    # force replace to be idempotent across multi-rank launches
+    OmegaConf.register_new_resolver("len", lambda x: len(x), replace=True)
+    # 필요하면 여기서 추가 resolver를 계속 등록할 수 있음
+    # 예: OmegaConf.register_new_resolver("prod", lambda a,b: a*b, replace=True)
+
+_safe_register_resolvers()
 
 @hydra.main(config_path="config", config_name="base")
 def main(config):
