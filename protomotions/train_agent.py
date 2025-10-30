@@ -1,46 +1,43 @@
 import os
-
-os.environ["WANDB_DISABLE_SENTRY"] = "true"  # Must be first environment variable
-os.environ["WANDB_SILENT"] = "true"
-os.environ["WANDB_DISABLE_CODE"] = "true"
-
 import sys
 import platform
 from pathlib import Path
 import logging
 import hydra
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
+import torch
 
+# wandb는 선택적 사용
+try:
+    import wandb
+    from lightning.pytorch.loggers import WandbLogger
+except Exception:
+    wandb = None
+    WandbLogger = tuple()  # isinstance 체크 회피용
+
+from lightning.fabric import Fabric
+
+# --- 기존 코드와 동일한 시뮬레이터 자동 감지 로직 ---
 has_robot_arg = False
 simulator = None
 for arg in sys.argv:
-    # This hack ensures that isaacgym is imported before any torch modules.
-    # The reason it is here (and not in the main func) is due to pytorch lightning multi-gpu behavior.
     if "robot" in arg:
         has_robot_arg = True
     if "simulator" in arg:
         if not has_robot_arg:
             raise ValueError("+robot argument should be provided before +simulator")
-        if "isaacgym" in arg.split("=")[-1]:
+        sim_val = arg.split("=", 1)[-1]
+        if "isaacgym" in sim_val:
             import isaacgym  # noqa: F401
-
             simulator = "isaacgym"
-        elif "isaaclab" in arg.split("=")[-1]:
+        elif "isaaclab" in sim_val:
+            # AppLauncher는 isaaclab 경로 하위에 있음
             from isaaclab.app import AppLauncher
-
             simulator = "isaaclab"
 
-import wandb  # noqa: E402
-from lightning.pytorch.loggers import WandbLogger  # noqa: E402
-import torch  # noqa: E402
-from lightning.fabric import Fabric  # noqa: E402
-from utils.config_utils import *  # noqa: E402, F403
-from utils.common import seeding  # noqa: E402, F403
-
-from protomotions.agents.ppo.agent import PPO  # noqa: E402
-
+# 로거
 log = logging.getLogger(__name__)
-
 
 @hydra.main(config_path="config", config_name="base")
 def main(config):
